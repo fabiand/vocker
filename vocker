@@ -270,7 +270,8 @@ if __name__ == "__main__":
         disk.create()
 
         # FIXME set the hostname inside the VM
-        # fish(disk.filename, "write", "/etc/hostname", args.name)
+        if args.hack_hostname:
+            fish(disk.filename, "write", "/etc/hostname", args.name)
 
         virt_install("--name", args.name,
                      "--memory", args.memory,
@@ -366,6 +367,9 @@ if __name__ == "__main__":
                                 help="Create a VM from an image")
     run.add_argument("--name", default=namegen())
     run.add_argument("-i", action="store_true")
+    run.add_argument("-t", action="store_true")
+    run.add_argument("--hack-hostname", action="store_true",
+                     help="Hack: Slowing down run, but sets hostname")
     run.add_argument("--memory", "-m", default="1024",
                      help="Amount of memory to allow")
     run.add_argument("IMAGE")
