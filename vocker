@@ -132,6 +132,9 @@ class CmdOperation(Operation):
     cmd = "CMD"
 
     def apply(self, layer):
+        if self.args.startswith("["):
+            log.warn("Not supporting CMD […], copying it anyway")
+
         fish(layer.filename,
              "write", "/etc/rc.d/rc.local", "#!/bin/bash\n\n" + self.args,
              ":",
@@ -144,8 +147,18 @@ class CmdOperation(Operation):
              "sh", "sed -i '/^SELINUX=/ s/=.*/=permissive/' /etc/sysconfig/selinux")
 
 
-class IgnoreOperation(Operation):
+class ExposeOperation(Operation):
+    cmd = "EXPOSE"
 
+    def apply(self, layer):
+        if not self.args.isdigit():
+            log.error("Only supporting EXPOSE <port> ignoring")
+            return
+        fish(layer.filename,
+            "sh", "firewall-offline-cmd --add-port=%s/tcp" % self.args)
+
+
+class IgnoreOperation(Operation):
     def apply(self, layer):
         log.warn("Ignoring operation %s" % self.cmd)
 
@@ -209,7 +222,8 @@ class OpParser():
         RunOperation,
         CmdOperation,
         MaintainerOperation,
-        EnvOperation]
+        EnvOperation,
+        ExposeOperation]
 
     def parse(self, data):
         known_ops_map = dict((op.cmd, op) for op in self.known_ops)
@@ -259,7 +273,7 @@ if __name__ == "__main__":
         # fish(disk.filename, "write", "/etc/hostname", args.name)
 
         virt_install("--name", args.name,
-                     "--memory", "1024",
+                     "--memory", args.memory,
                      "--vcpus", "4",
                      "--metadata", "description=vocker/%s" % args.name,
                      "--import",
@@ -352,13 +366,15 @@ if __name__ == "__main__":
                                 help="Create a VM from an image")
     run.add_argument("--name", default=namegen())
     run.add_argument("-i", action="store_true")
+    run.add_argument("--memory", "-m", default="1024",
+                     help="Amount of memory to allow")
     run.add_argument("IMAGE")
     run.set_defaults(func=do_run)
 
-    run = subparsers.add_parser("attach",
+    attach = subparsers.add_parser("attach",
                                 help="Attach to a VM")
-    run.add_argument("NAME")
-    run.set_defaults(func=do_attach)
+    attach.add_argument("NAME")
+    attach.set_defaults(func=do_attach)
 
     rm = subparsers.add_parser("rm",
                                help="Destroy a VM")
