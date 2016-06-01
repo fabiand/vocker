@@ -21,7 +21,7 @@ IMAGES_DIR = BASE + "images/"
 
 builder = sh.virt_builder.bake()
 qemu_img = sh.qemu_img.bake()
-fish = sh.guestfish.bake("--network")
+fish = sh.guestfish.bake("--network", "-ia")
 virt_install = sh.virt_install
 
 
@@ -124,7 +124,7 @@ class RunOperation(Operation):
     cmd = "RUN"
 
     def apply(self, layer):
-        fish("-ia", layer.filename,
+        fish(layer.filename,
              "sh", self.args)
 
 
@@ -132,14 +132,14 @@ class CmdOperation(Operation):
     cmd = "CMD"
 
     def apply(self, layer):
-        fish("-ia", layer.filename,
+        fish(layer.filename,
              "write", "/etc/rc.d/rc.local", "#!/bin/bash\n\n" + self.args,
              ":",
              "sh", "chmod a+x /etc/rc.d/rc.local",
              ":",
              "sh", "sed -i '/^ExecStart=/ s/$/ --autologin root/' /usr/lib/systemd/system/getty@.service /usr/lib/systemd/system/serial-getty@.service",
              ":",
-             "sh", "sed -i '/linux.*vmlinuz/ s/$/ quiet/' /boot/grub2/grub.cfg",
+             "sh", "sed -i -e '/linux.*vmlinuz/ s/$/ quiet/' -e 's/timeout=[^ ]*/timeout=1/' /boot/grub2/grub.cfg",
              ":",
              "sh", "sed -i '/^SELINUX=/ s/=.*/=permissive/' /etc/sysconfig/selinux")
 
@@ -255,17 +255,20 @@ if __name__ == "__main__":
         disk = layer.derive(diskname)
         disk.create()
 
-        print(virt_install("--name", args.name,
-                           "--memory", "1024",
-                           "--vcpus", "4",
-                           "--metadata", "description=vocker/%s" % args.name,
-                           "--import",
-                           "--disk", disk.filename,
-                           "--network", "user",
-                           "--graphics", "spice",
-                           "--memballoon", "model=virtio",
-                           "--rng", "/dev/random",
-                           "--noautoconsole"))
+        # FIXME set the hostname inside the VM
+        # fish(disk.filename, "write", "/etc/hostname", args.name)
+
+        virt_install("--name", args.name,
+                     "--memory", "1024",
+                     "--vcpus", "4",
+                     "--metadata", "description=vocker/%s" % args.name,
+                     "--import",
+                     "--disk", disk.filename,
+                     "--network", "user",
+                     "--graphics", "spice",
+                     "--memballoon", "model=virtio",
+                     "--rng", "/dev/random",
+                     "--noautoconsole")
 
         print(args.name)
 
@@ -279,9 +282,15 @@ if __name__ == "__main__":
         os.execv("/usr/bin/virsh", ["/usr/bin/virsh", "console", name])
 
     def do_rm(args):
-        log.info("Removing %s" % args.NAME)
-        sh.virsh("destroy", args.NAME)
-        sh.virsh("undefine", args.NAME)
+        _rm(args.NAME)
+
+    def _rm(name):
+        log.info("Removing %s" % name)
+        try:
+            sh.virsh("destroy", name)
+        except:
+            pass
+        sh.virsh("undefine", name)
 
     def do_add_network(args):
         log.info("Adding network %s" % args.NAME)
