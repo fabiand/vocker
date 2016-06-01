@@ -7,6 +7,8 @@ import hashlib
 import logging
 import argparse
 import random
+import tempfile
+import ipaddress
 
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
@@ -31,6 +33,11 @@ def namegen():
     random.shuffle(nom)
 
     return "%s_%s" % (attr.pop(), nom.pop())
+
+
+def subnetgen():
+    # TODO come up with something real
+    return "10.%d.%d.0/24" % (random.randint(0, 255), random.randint(0, 255))
 
 
 def md5sum(txt):
@@ -277,6 +284,41 @@ if __name__ == "__main__":
         sh.virsh("destroy", args.NAME)
         sh.virsh("undefine", args.NAME)
 
+    def do_add_network(args):
+        log.info("Adding network %s" % args.NAME)
+        print(args.subnet.netmask)
+        netmask = args.subnet.netmask
+        network_ip = args.subnet.network_address
+        broadcast_ip = args.subnet.broadcast_address
+
+        def_string = """
+      <network>
+        <name>%s</name>
+        <bridge name="vocker-%s" />
+        <ip address="%s" netmask="%s">
+          <dhcp>
+            <range start="%s" end="%s" />
+          </dhcp>
+        </ip>
+      </network>
+                    """ % (args.NAME,
+                           args.NAME,
+                           network_ip+1,
+                           netmask,
+                           network_ip+2,
+                           broadcast_ip-1)
+        with tempfile.NamedTemporaryFile(delete=True) as net_def:
+            net_def.write(def_string.encode())
+            net_def.flush()
+            print(sh.virsh("net-create", net_def.name))
+
+    def do_rm_network(args):
+        log.info("Removing network %s" % args.NAME)
+        print(sh.virsh("net-destroy", args.NAME))
+
+    def do_list_networks(args):
+        print(sh.virsh("net-list"))
+
     try:
        os.makedirs(IMAGE_DIRS)
     except:
@@ -314,6 +356,25 @@ if __name__ == "__main__":
                                help="Destroy a VM")
     rm.add_argument("NAME")
     rm.set_defaults(func=do_rm)
+
+    network = subparsers.add_parser("network",
+                                    help="Manage networks")
+
+    network_subparsers = network.add_subparsers()
+    add_network = network_subparsers.add_parser("add",
+                                                help="Add a network")
+    add_network.add_argument("NAME")
+    add_network.add_argument("--subnet", default=subnetgen(), type=ipaddress.IPv4Network)
+    add_network.set_defaults(func=do_add_network)
+    rm_network = network_subparsers.add_parser("rm",
+                                               help="Destroy a network")
+    rm_network.add_argument("NAME")
+    rm_network.set_defaults(func=do_rm_network)
+
+    ls_network = network_subparsers.add_parser("ls",
+                                               help="Show networks")
+    ls_network.set_defaults(func=do_list_networks)
+
 
     args = argparser.parse_args()
 
