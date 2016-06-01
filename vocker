@@ -1,0 +1,302 @@
+#!/usr/bin/env python3
+
+import sys
+import sh
+import os
+import hashlib
+import logging as log
+import argparse
+import random
+
+
+log.basicConfig(level=log.DEBUG)
+
+
+BASE = os.path.expanduser("~/.cache/vocker/")
+IMAGES_DIR = BASE + "images/"
+
+
+builder = sh.virt_builder.bake()
+qemu_img = sh.qemu_img.bake()
+fish = sh.guestfish.bake("--network")
+virt_install = sh.virt_install
+
+
+def namegen():
+    attr = ["fancy", "strong", "crazy", "atomic", "friendly", "thoughtful", "mindful", "bar", "peaceful"]
+    nom = ["star", "tree", "grass", "einstein", "unicorn", "foo", "planet", "stone", "grape", "fedora"]
+
+    random.shuffle(attr)
+    random.shuffle(nom)
+
+    return "%s_%s" % (attr.pop(), nom.pop())
+
+
+def md5sum(txt):
+    m = hashlib.md5()
+    m.update(txt.encode("utf-8"))
+    return str(m.hexdigest())
+
+
+class Layer():
+    parent = None
+    filename = None
+
+    def __str__(self):
+        return "<Layer %s />" % self.filename
+
+    def derived_name(self, op):
+        return str(md5sum("%s+%s" % (self.filename, op)))
+
+    def derive_for_op(self, op):
+        return self.derive(self.derived_name(op))
+
+    def derive(self, filename):
+        layer = Layer()
+        layer.parent = self
+        layer.filename = IMAGES_DIR + filename
+
+        log.info("Deriving layer %s from %s" % (layer,
+                                                layer.parent))
+
+        return layer
+
+    def create(self):
+        log.info("Creating layer %s from %s" % (self,
+                                                self.parent))
+
+
+        qemu_img.create("-fqcow2", "-o", "backing_file=%s" % self.parent.filename, self.filename)
+
+    def exists(self):
+        return self.filename and os.path.exists(self.filename)
+
+
+class Operation():
+    cmd = None
+    args = None
+
+    def __init__(self, args):
+        self.args = args
+
+    def apply(self, layer):
+        raise NotImplementedError
+
+    def __str__(self):
+        return "%s(%r)" % (self.cmd, self.args)
+
+    def __repr__(self):
+        return "<%s 0x%x />" % (self, id(self))
+
+
+class FromOperation(Operation):
+    cmd = "FROM"
+
+    def _guess_tmpl(self, args):
+        # Works for i.e. fedora:23
+        return args.replace(":", "-")
+
+    def apply(self, layer):
+        tmpl = self._guess_tmpl(self.args)
+        layer.filename = IMAGES_DIR + tmpl + ".qcow2"
+        log.debug("Checking presence: %s" % layer.filename)
+        if os.path.exists(layer.filename):
+            log.info("Reusing base %s" % layer)
+        else:
+            builder("--format=qcow2", "-o", layer.filename, tmpl)
+            log.info("Created base %s" % layer)
+        return layer
+
+
+class RunOperation(Operation):
+    cmd = "RUN"
+    def apply(self, layer):
+        fish("-ia", layer.filename,
+             "sh", self.args)
+
+
+class CmdOperation(Operation):
+    cmd = "CMD"
+    def apply(self, layer):
+        fish("-ia", layer.filename,
+             "write", "/etc/rc.d/rc.local", "#!/bin/bash\n\n" + self.args,
+             ":",
+             "sh", "chmod a+x /etc/rc.d/rc.local",
+             ":",
+             "sh", "sed -i '/^ExecStart=/ s/$/ --autologin root/' /usr/lib/systemd/system/getty@.service /usr/lib/systemd/system/serial-getty@.service",
+             ":",
+             "sh", "sed -i '/linux.*vmlinuz/ s/$/ quiet/' /boot/grub2/grub.cfg",
+             ":",
+             "sh", "sed -i '/^SELINUX=/ s/=.*/=permissive/' /etc/sysconfig/selinux")
+
+
+
+class IgnoreOperation(Operation):
+    def apply(self, layer):
+        log.warn("Ignoring operation %s" % self.cmd)
+
+
+class MaintainerOperation(IgnoreOperation):
+    cmd = "MAINTAINER"
+
+
+class EnvOperation(IgnoreOperation):
+    cmd = "ENV"
+
+
+class Context():
+    do_rebuild = False
+
+    layers = None
+    operations = None
+
+    @property
+    def layer(self):
+        return self.layers[-1] if self.layers else None
+
+    @layer.setter
+    def layer_set(self, val):
+        self.layers.append(val)
+
+    def run(self, ops):
+        for op in ops:
+            self.apply(op)
+        return self.layer
+
+    def apply(self, op):
+        log.info("Applying to context %s: %s" % (self, op))
+
+        if self.layers is None:
+            log.debug("Initializing first image")
+            self.layers = []
+            new_layer = Layer()
+            op.apply(new_layer)
+        else:
+            new_layer = self.layer.derive_for_op(op)
+
+            do_build = self.do_rebuild or not new_layer.exists()
+            if do_build:
+                new_layer.create()
+                op.apply(new_layer)
+
+        self.layers.append(new_layer)
+
+    def tag(self, name):
+        self.layer.derive(name).create()
+        return name
+
+
+class OpParser():
+    known_ops = [
+        FromOperation,
+        RunOperation,
+        CmdOperation,
+        MaintainerOperation,
+        EnvOperation]
+
+    def parse(self, data):
+        known_ops_map = dict((op.cmd, op) for op in self.known_ops)
+        parsed_ops = []
+        data = data.replace("\\\n", "")
+        for line in data.splitlines():
+            line = line.strip()
+            if not line or line.startswith("#"):
+                continue
+            log.debug("Parsing line: %s" % line)
+            cmd, args = line.split(" ", 1)
+            try:
+                op = known_ops_map[cmd]
+                parsed_ops.append(op(args))
+            except:
+                log.exception("Unknown op: %s" % cmd)
+
+        return parsed_ops
+
+if __name__ == "__main__":
+    def do_build(args):
+        print("Creating %s" % args.tag)
+
+        p = OpParser()
+        ops = p.parse(sys.stdin.read())
+
+        log.debug(ops)
+
+        ctx = Context()
+        ctx.do_rebuild = args.force_rm
+        log.debug(ctx.run(ops))
+
+        if args.tag:
+            print(ctx.tag(args.tag))
+
+    def do_run(args):
+        diskname = args.IMAGE + "-" + args.name
+        layer = Layer()
+        layer.filename = IMAGES_DIR + args.IMAGE
+        disk = layer.derive(diskname)
+        disk.create()
+
+        print(virt_install("--name", args.name,
+                     "--memory", "1024",
+                     "--vcpus", "4",
+                     "--metadata", "description=vocker/%s" % args.name,
+                     "--import",
+                     "--disk", disk.filename,
+                     "--network", "user",
+                     "--graphics", "spice",
+                     "--memballoon", "model=virtio",
+                     "--rng", "/dev/random",
+                     "--noautoconsole"))
+
+        print(args.name)
+
+        if args.i:
+            _attach(args.name)
+
+
+    def do_attach(args):
+        _attach(args.NAME)
+
+
+    def _attach(name):
+        os.execv("/usr/bin/virsh", ["/usr/bin/virsh", "console", name])
+
+
+    def do_rm(args):
+        sh.virsh("destroy", args.NAME)
+        sh.virsh("undefine", args.NAME)
+
+    try:
+       os.makedirs(IMAGE_DIRS)
+    except:
+        pass
+    log.debug("Using images dir: %s" % IMAGES_DIR)
+
+    argparser = argparse.ArgumentParser(description='Vocker!')
+    subparsers = argparser.add_subparsers()
+    build = subparsers.add_parser("build",
+                                  help="Build an image")
+    build.add_argument("--tag", nargs="?",
+                       help="Give the image a name")
+    build.add_argument("--force-rm", action="store_true")
+    build.set_defaults(func=do_build)
+
+    run = subparsers.add_parser("run",
+                                help="Create a VM from an image")
+    run.add_argument("--name", default=namegen())
+    run.add_argument("-i", action="store_true")
+    run.add_argument("IMAGE")
+    run.set_defaults(func=do_run)
+
+    run = subparsers.add_parser("attach",
+                                help="Attach to a VM")
+    run.add_argument("NAME")
+    run.set_defaults(func=do_attach)
+
+    rm = subparsers.add_parser("rm",
+                               help="Destroy a VM")
+    rm.add_argument("NAME")
+    rm.set_defaults(func=do_rm)
+    args = argparser.parse_args()
+
+    if "func" in args:
+        args.func(args)
