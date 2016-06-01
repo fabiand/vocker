@@ -12,6 +12,12 @@ It caches the images, which makes it fast.
 
 > Note: This is WIP. Not all features are supported (yet).
 
+A quick demo:
+
+[![asciicast](https://asciinema.org/a/091pvgwprx0fa5oosr4jcu9am.png)](https://asciinema.org/a/091pvgwprx0fa5oosr4jcu9am)
+
+With more details:
+
 [![asciicast](https://asciinema.org/a/eg1ccvapczlg6k2tql7kt4xru.png)](https://asciinema.org/a/eg1ccvapczlg6k2tql7kt4xru)
 
 
