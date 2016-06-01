@@ -4,12 +4,13 @@ import sys
 import sh
 import os
 import hashlib
-import logging as log
+import logging
 import argparse
 import random
 
 
-log.basicConfig(level=log.DEBUG)
+logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
+log = logging.getLogger()
 
 
 BASE = os.path.expanduser("~/.cache/vocker/")
@@ -40,31 +41,34 @@ def md5sum(txt):
 
 class Layer():
     parent = None
-    filename = None
+    name = None
+
+    @property
+    def filename(self):
+        return IMAGES_DIR + self.name
 
     def __str__(self):
-        return "<Layer %s />" % self.filename
+        return "<Layer %s />" % self.name
 
     def derived_name(self, op):
-        return str(md5sum("%s+%s" % (self.filename, op)))
+        return str(md5sum("%s+%s" % (self.name, op)))
 
     def derive_for_op(self, op):
         return self.derive(self.derived_name(op))
 
-    def derive(self, filename):
+    def derive(self, name):
         layer = Layer()
         layer.parent = self
-        layer.filename = IMAGES_DIR + filename
+        layer.name = name
 
-        log.info("Deriving layer %s from %s" % (layer,
-                                                layer.parent))
+        log.debug("Deriving layer %s from %s" % (layer,
+                                                 layer.parent))
 
         return layer
 
     def create(self):
-        log.info("Creating layer %s from %s" % (self,
-                                                self.parent))
-
+        log.debug("Creating layer %s from %s" % (self,
+                                                 self.parent))
 
         qemu_img.create("-fqcow2", "-o", "backing_file=%s" % self.parent.filename, self.filename)
 
@@ -98,13 +102,14 @@ class FromOperation(Operation):
 
     def apply(self, layer):
         tmpl = self._guess_tmpl(self.args)
-        layer.filename = IMAGES_DIR + tmpl + ".qcow2"
+        layer.name = tmpl + ".qcow2"
         log.debug("Checking presence: %s" % layer.filename)
         if os.path.exists(layer.filename):
-            log.info("Reusing base %s" % layer)
+            log.debug("Reusing base %s" % layer)
         else:
+            log.info("Fetching new base %s" % layer.name)
             builder("--format=qcow2", "-o", layer.filename, tmpl)
-            log.info("Created base %s" % layer)
+            log.debug("Created base %s" % layer)
         return layer
 
 
@@ -164,7 +169,8 @@ class Context():
         return self.layer
 
     def apply(self, op):
-        log.info("Applying to context %s: %s" % (self, op))
+        log.debug("Applying to context %s: %s" % (self, op))
+        log.info(" %s" % op)
 
         if self.layers is None:
             log.debug("Initializing first image")
@@ -175,11 +181,13 @@ class Context():
             new_layer = self.layer.derive_for_op(op)
 
             do_build = self.do_rebuild or not new_layer.exists()
+            log.debug("Build layer: %s" % do_build)
             if do_build:
                 new_layer.create()
                 op.apply(new_layer)
 
         self.layers.append(new_layer)
+        log.info(" -> %s" % new_layer)
 
     def tag(self, name):
         self.layer.derive(name).create()
@@ -214,7 +222,7 @@ class OpParser():
 
 if __name__ == "__main__":
     def do_build(args):
-        print("Creating %s" % args.tag)
+        log.info("Building")
 
         p = OpParser()
         ops = p.parse(sys.stdin.read())
@@ -226,12 +234,15 @@ if __name__ == "__main__":
         log.debug(ctx.run(ops))
 
         if args.tag:
+            log.info("Tagging as %s" % args.tag)
             print(ctx.tag(args.tag))
 
     def do_run(args):
+        log.info("Instanciating %s as %s" % (args.IMAGE, args.name))
+
         diskname = args.IMAGE + "-" + args.name
         layer = Layer()
-        layer.filename = IMAGES_DIR + args.IMAGE
+        layer.name = args.IMAGE
         disk = layer.derive(diskname)
         disk.create()
 
@@ -262,6 +273,7 @@ if __name__ == "__main__":
 
 
     def do_rm(args):
+        log.info("Removing %s" % args.NAME)
         sh.virsh("destroy", args.NAME)
         sh.virsh("undefine", args.NAME)
 
@@ -272,9 +284,15 @@ if __name__ == "__main__":
     log.debug("Using images dir: %s" % IMAGES_DIR)
 
     argparser = argparse.ArgumentParser(description='Vocker!')
+
+    argparser.add_argument("--debug", action="store_true")
+
     subparsers = argparser.add_subparsers()
     build = subparsers.add_parser("build",
                                   help="Build an image")
+    build.add_argument("SOURCE", nargs="?",
+                       type=argparse.FileType('r'),
+                       default=sys.stdin)
     build.add_argument("--tag", nargs="?",
                        help="Give the image a name")
     build.add_argument("--force-rm", action="store_true")
@@ -296,7 +314,11 @@ if __name__ == "__main__":
                                help="Destroy a VM")
     rm.add_argument("NAME")
     rm.set_defaults(func=do_rm)
+
     args = argparser.parse_args()
+
+    if args.debug:
+        log.setLevel(logging.DEBUG)
 
     if "func" in args:
         args.func(args)
