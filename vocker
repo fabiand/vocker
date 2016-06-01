@@ -122,6 +122,7 @@ class FromOperation(Operation):
 
 class RunOperation(Operation):
     cmd = "RUN"
+
     def apply(self, layer):
         fish("-ia", layer.filename,
              "sh", self.args)
@@ -129,6 +130,7 @@ class RunOperation(Operation):
 
 class CmdOperation(Operation):
     cmd = "CMD"
+
     def apply(self, layer):
         fish("-ia", layer.filename,
              "write", "/etc/rc.d/rc.local", "#!/bin/bash\n\n" + self.args,
@@ -142,8 +144,8 @@ class CmdOperation(Operation):
              "sh", "sed -i '/^SELINUX=/ s/=.*/=permissive/' /etc/sysconfig/selinux")
 
 
-
 class IgnoreOperation(Operation):
+
     def apply(self, layer):
         log.warn("Ignoring operation %s" % self.cmd)
 
@@ -254,30 +256,27 @@ if __name__ == "__main__":
         disk.create()
 
         print(virt_install("--name", args.name,
-                     "--memory", "1024",
-                     "--vcpus", "4",
-                     "--metadata", "description=vocker/%s" % args.name,
-                     "--import",
-                     "--disk", disk.filename,
-                     "--network", "user",
-                     "--graphics", "spice",
-                     "--memballoon", "model=virtio",
-                     "--rng", "/dev/random",
-                     "--noautoconsole"))
+                           "--memory", "1024",
+                           "--vcpus", "4",
+                           "--metadata", "description=vocker/%s" % args.name,
+                           "--import",
+                           "--disk", disk.filename,
+                           "--network", "user",
+                           "--graphics", "spice",
+                           "--memballoon", "model=virtio",
+                           "--rng", "/dev/random",
+                           "--noautoconsole"))
 
         print(args.name)
 
         if args.i:
             _attach(args.name)
 
-
     def do_attach(args):
         _attach(args.NAME)
 
-
     def _attach(name):
         os.execv("/usr/bin/virsh", ["/usr/bin/virsh", "console", name])
-
 
     def do_rm(args):
         log.info("Removing %s" % args.NAME)
@@ -303,10 +302,10 @@ if __name__ == "__main__":
       </network>
                     """ % (args.NAME,
                            args.NAME,
-                           network_ip+1,
+                           network_ip + 1,
                            netmask,
-                           network_ip+2,
-                           broadcast_ip-1)
+                           network_ip + 2,
+                           broadcast_ip - 1)
         with tempfile.NamedTemporaryFile(delete=True) as net_def:
             net_def.write(def_string.encode())
             net_def.flush()
@@ -374,7 +373,6 @@ if __name__ == "__main__":
     ls_network = network_subparsers.add_parser("ls",
                                                help="Show networks")
     ls_network.set_defaults(func=do_list_networks)
-
 
     args = argparser.parse_args()
 
