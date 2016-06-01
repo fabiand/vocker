@@ -343,7 +343,7 @@ if __name__ == "__main__":
     build.add_argument("SOURCE", nargs="?",
                        type=argparse.FileType('r'),
                        default=sys.stdin)
-    build.add_argument("--tag", nargs="?",
+    build.add_argument("--tag", "-t", nargs="?",
                        help="Give the image a name")
     build.add_argument("--force-rm", action="store_true")
     build.set_defaults(func=do_build)
