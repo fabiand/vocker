@@ -249,7 +249,8 @@ if __name__ == "__main__":
         log.info("Building")
 
         p = OpParser()
-        ops = p.parse(sys.stdin.read())
+        with open(args.file) as vockerfile:
+            ops = p.parse(vockerfile.read())
 
         log.debug(ops)
 
@@ -366,6 +367,7 @@ if __name__ == "__main__":
     build.add_argument("--tag", "-t", nargs="?",
                        help="Give the image a name")
     build.add_argument("--force-rm", action="store_true")
+    build.add_argument("--file", "-f", default="Vockerfile")
     build.set_defaults(func=do_build)
 
     run = subparsers.add_parser("run",
