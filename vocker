@@ -10,6 +10,7 @@ import random
 import tempfile
 import ipaddress
 import errno
+import xml.etree.ElementTree as ET
 
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
@@ -266,9 +267,9 @@ if __name__ == "__main__":
         log.info("Instanciating %s as %s" % (args.IMAGE, args.name))
 
         diskname = args.IMAGE + "-" + args.name
-        layer = Layer()
-        layer.name = args.IMAGE
-        disk = layer.derive(diskname)
+        image = Layer()
+        image.name = args.IMAGE
+        disk = image.derive(diskname)
         disk.create()
         if args.net != "user":
             args.net = "network=%s" % args.net
@@ -277,7 +278,7 @@ if __name__ == "__main__":
         if args.hack_hostname:
             fish(disk.filename, "write", "/etc/hostname", args.name)
 
-        virt_install("--name", args.name,
+        xml = virt_install("--name", args.name,
                      "--memory", args.memory,
                      "--vcpus", "4",
                      "--metadata", "description=vocker/%s" % args.name,
@@ -287,7 +288,52 @@ if __name__ == "__main__":
                      "--graphics", "spice",
                      "--memballoon", "model=virtio",
                      "--rng", "/dev/random",
-                     "--noautoconsole")
+                     "--noautoconsole",
+                     "--print-xml")
+        xml = str(xml)
+
+        if args.publish:
+            hostport, innerport = args.publish.split(":")
+
+            def random_mac():
+                """Generate a random mac
+                """
+                mac = [0x00, 0x16, 0x3e,
+                       random.randint(0x00, 0x7f),
+                       random.randint(0x00, 0xff),
+                       random.randint(0x00, 0xff)]
+                return ':'.join(map(lambda x: "%02x" % x, mac))
+
+            domroot = ET.fromstring(xml)
+
+            # Needed to make guest ssh port accessible from the outside
+            # http://blog.vmsplice.net/2011/04/
+            # how-to-pass-qemu-command-line-options.html
+            ET.register_namespace("qemu", "http://libvirt.org/"
+                                  "schemas/domain/qemu/1.0")
+            snippet = ET.fromstring("""
+            <qemu:commandline
+             xmlns:qemu="http://libvirt.org/schemas/domain/qemu/1.0">
+            <qemu:arg value='-redir'/>
+            <qemu:arg value='tcp:{hostport}::{innerport}'/>
+            <qemu:arg value='-netdev'/>
+            <qemu:arg value='socket,id=busnet0,mcast=230.0.0.1:1234'/>
+            <qemu:arg value='-device'/>
+            <qemu:arg value='virtio-net-pci,netdev=busnet0,mac={mac}'/>
+            </qemu:commandline>
+            """.format(hostport=hostport, innerport=innerport,
+                       mac=random_mac()))
+            domroot.append(snippet)
+
+            xml = ET.tostring(domroot)
+
+
+
+        with tempfile.NamedTemporaryFile("wb") as spec:
+            spec.write(xml)
+            spec.flush()
+            sh.virsh("define", spec.name)
+            sh.virsh("start", args.name)
 
         print(args.name)
 
@@ -382,6 +428,7 @@ if __name__ == "__main__":
     run.add_argument("--rm", action="store_true")
     run.add_argument("-i", action="store_true")
     run.add_argument("--net", default="user")
+    run.add_argument("--publish", "-p", help="Publish a port (hostport:innerport)")
     run.add_argument("-t", action="store_true")
     run.add_argument("--hack-hostname", action="store_true",
                      help="Hack: Slowing down run, but sets hostname")
