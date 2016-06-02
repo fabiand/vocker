@@ -294,11 +294,17 @@ if __name__ == "__main__":
         if args.i:
             _attach(args.name)
 
+        if args.rm:
+            _rm(args.name)
+
     def do_attach(args):
         _attach(args.NAME)
 
     def _attach(name):
-        os.execv("/usr/bin/virsh", ["/usr/bin/virsh", "console", name])
+        child_pid = os.fork()
+        if child_pid == 0:
+            os.execv("/usr/bin/virsh", ["/usr/bin/virsh", "console", name])
+        os.waitpid(child_pid, 0)
 
     def do_rm(args):
         _rm(args.NAME)
@@ -373,6 +379,7 @@ if __name__ == "__main__":
     run = subparsers.add_parser("run",
                                 help="Create a VM from an image")
     run.add_argument("--name", default=namegen())
+    run.add_argument("--rm", action="store_true")
     run.add_argument("-i", action="store_true")
     run.add_argument("--net", default="user")
     run.add_argument("-t", action="store_true")
