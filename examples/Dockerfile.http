@@ -2,7 +2,7 @@ FROM fedora:23
 
 MAINTAINER "Roman Mohr" <rmohr@redhat.com>
 
-ENV HELLO "Hello World"
+ENV HELLO="Hello World"
 
 RUN pip3 install --no-cache-dir static3
 

@@ -124,21 +124,32 @@ class FromOperation(Operation):
 
 class RunOperation(Operation):
     cmd = "RUN"
+    env = []
 
     def apply(self, layer):
+        env = " ".join(self.env)
+        cmd = "export %s ; %s" % (env, self.args)
+
+        log.debug("Run: %s" % cmd)
+
         fish(layer.filename,
-             "sh", self.args)
+             "sh", cmd)
 
 
 class CmdOperation(Operation):
     cmd = "CMD"
+    env = []
 
     def apply(self, layer):
         if self.args.startswith("["):
             log.warn("Not supporting CMD […], copying it anyway")
 
+        env = ["export %s" % e for e in self.env if "=" in e]
+        cmd = "#!/bin/bash\n\n%s\n\n%s" % ("\n".join(env), self.args)
+        log.debug("rc.local: %s" % cmd)
+
         fish(layer.filename,
-             "write", "/etc/rc.d/rc.local", "#!/bin/bash\n\n" + self.args,
+             "write", "/etc/rc.d/rc.local", cmd,
              ":",
              "sh", "chmod a+x /etc/rc.d/rc.local",
              ":",
@@ -169,8 +180,12 @@ class MaintainerOperation(IgnoreOperation):
     cmd = "MAINTAINER"
 
 
-class EnvOperation(IgnoreOperation):
+class EnvOperation(Operation):
     cmd = "ENV"
+
+    def apply(self, layer):
+        CmdOperation.env.append(self.args)
+        RunOperation.env.append(self.args)
 
 
 class Context():
