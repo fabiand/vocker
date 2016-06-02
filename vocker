@@ -9,6 +9,7 @@ import argparse
 import random
 import tempfile
 import ipaddress
+import errno
 
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
@@ -343,9 +344,11 @@ if __name__ == "__main__":
         print(sh.virsh("net-list"))
 
     try:
-       os.makedirs(IMAGE_DIRS)
-    except:
-        pass
+        os.makedirs(IMAGES_DIR)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            log.error(e)
+            exit(1)
     log.debug("Using images dir: %s" % IMAGES_DIR)
 
     argparser = argparse.ArgumentParser(description='Vocker!')
