@@ -26,7 +26,7 @@ Usage
 
 The usage should look familiar:
 
-    $ ./vocker build --tag simple < examples/Dockerfile.simple
+    $ ./vocker build --tag simple -f examples/Dockerfile.simple
     $ ./vocker run simple
     fast_fedora
     $ ./vocker attach fast_fedora

@@ -9,6 +9,7 @@ import argparse
 import random
 import tempfile
 import ipaddress
+import errno
 
 
 logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
@@ -248,7 +249,8 @@ if __name__ == "__main__":
         log.info("Building")
 
         p = OpParser()
-        ops = p.parse(sys.stdin.read())
+        with open(args.file) as vockerfile:
+            ops = p.parse(vockerfile.read())
 
         log.debug(ops)
 
@@ -268,6 +270,8 @@ if __name__ == "__main__":
         layer.name = args.IMAGE
         disk = layer.derive(diskname)
         disk.create()
+        if args.net != "user":
+            args.net = "network=%s" % args.net
 
         # FIXME set the hostname inside the VM
         if args.hack_hostname:
@@ -279,7 +283,7 @@ if __name__ == "__main__":
                      "--metadata", "description=vocker/%s" % args.name,
                      "--import",
                      "--disk", disk.filename,
-                     "--network", "user",
+                     "--network", args.net,
                      "--graphics", "spice",
                      "--memballoon", "model=virtio",
                      "--rng", "/dev/random",
@@ -343,9 +347,11 @@ if __name__ == "__main__":
         print(sh.virsh("net-list"))
 
     try:
-       os.makedirs(IMAGE_DIRS)
-    except:
-        pass
+        os.makedirs(IMAGES_DIR)
+    except OSError as e:
+        if e.errno != errno.EEXIST:
+            log.error(e)
+            exit(1)
     log.debug("Using images dir: %s" % IMAGES_DIR)
 
     argparser = argparse.ArgumentParser(description='Vocker!')
@@ -361,12 +367,14 @@ if __name__ == "__main__":
     build.add_argument("--tag", "-t", nargs="?",
                        help="Give the image a name")
     build.add_argument("--force-rm", action="store_true")
+    build.add_argument("--file", "-f", default="Vockerfile")
     build.set_defaults(func=do_build)
 
     run = subparsers.add_parser("run",
                                 help="Create a VM from an image")
     run.add_argument("--name", default=namegen())
     run.add_argument("-i", action="store_true")
+    run.add_argument("--net", default="user")
     run.add_argument("-t", action="store_true")
     run.add_argument("--hack-hostname", action="store_true",
                      help="Hack: Slowing down run, but sets hostname")
