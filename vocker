@@ -269,6 +269,8 @@ if __name__ == "__main__":
         layer.name = args.IMAGE
         disk = layer.derive(diskname)
         disk.create()
+        if args.net != "user":
+            args.net = "network=%s" % args.net
 
         # FIXME set the hostname inside the VM
         if args.hack_hostname:
@@ -280,7 +282,7 @@ if __name__ == "__main__":
                      "--metadata", "description=vocker/%s" % args.name,
                      "--import",
                      "--disk", disk.filename,
-                     "--network", "user",
+                     "--network", args.net,
                      "--graphics", "spice",
                      "--memballoon", "model=virtio",
                      "--rng", "/dev/random",
@@ -370,6 +372,7 @@ if __name__ == "__main__":
                                 help="Create a VM from an image")
     run.add_argument("--name", default=namegen())
     run.add_argument("-i", action="store_true")
+    run.add_argument("--net", default="user")
     run.add_argument("-t", action="store_true")
     run.add_argument("--hack-hostname", action="store_true",
                      help="Hack: Slowing down run, but sets hostname")
