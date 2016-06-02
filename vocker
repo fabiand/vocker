@@ -419,7 +419,7 @@ if __name__ == "__main__":
     build.add_argument("--tag", "-t", nargs="?",
                        help="Give the image a name")
     build.add_argument("--force-rm", action="store_true")
-    build.add_argument("--file", "-f", default="Vockerfile")
+    build.add_argument("--file", "-f", default="Dockerfile")
     build.set_defaults(func=do_build)
 
     run = subparsers.add_parser("run",
