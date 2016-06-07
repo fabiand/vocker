@@ -260,7 +260,8 @@ class OpParser():
 
         return parsed_ops
 
-if __name__ == "__main__":
+
+def run():
     def do_build(args):
         log.info("Building")
 
@@ -487,3 +488,6 @@ if __name__ == "__main__":
 
     if "func" in args:
         args.func(args)
+
+if __name__ == "__main__":
+    run()
