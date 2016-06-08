@@ -306,7 +306,9 @@ def run():
                      "--rng", "/dev/random",
                      "--noautoconsole",
                      "--print-xml")
-        xml = str(xml)
+
+        # Decode it right away
+        xml = str(xml).encode("UTF-8")
 
         if args.publish:
             hostport, innerport = args.publish.split(":")
@@ -342,8 +344,6 @@ def run():
             domroot.append(snippet)
 
             xml = ET.tostring(domroot)
-
-
 
         with tempfile.NamedTemporaryFile("wb") as spec:
             spec.write(xml)
