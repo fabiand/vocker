@@ -71,4 +71,14 @@ Why?
 I think it's a nice approach to have a declarative approach
 for creating VMs.
 
+Tips
+----
 
+### Setting the root password
+
+By default a random root password is chosen. If you have to set the password
+during build time you can add the build instruction
+
+```
+RUN echo "mypass" | passwd --stdin
+```
