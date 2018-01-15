@@ -1,7 +1,7 @@
 FROM fedora:26
 
 
-RUN dnf install -y python3-pip qemu-img libguestfs-tools-c
+RUN dnf install -y python3-pip qemu-img libguestfs-tools-c virt-install
 
 ADD . /vocker.d/
 
