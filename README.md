@@ -46,6 +46,27 @@ $ vocker attach fast_fedora
 $ vocker export simple -f simple.raw
 ```
 
+Kubernetes Vocker Builder Usage
+-------------------------------
+
+In addition to the stock vocker tool, there is also a container and manifest
+to run vocker as a builder inside a Kubernetes cluster.
+
+The use-case is to use vocker, to build an VM image "onto" a block PV.
+The job definition is kept in the `manifests/` directory.
+
+In order to build a specific image, a vockerfile was to be written into the
+`vocker-job-source` ConfigMap.
+The ConfigMap is mapping a key to a vockerfile. The key will be used as the
+resulting image filename, which will be written on to the target PV, which is
+also defined in the Job definition.
+
+In order to build you custom images, you need to complete the following steps:
+
+1. Add entry to ConfigMap
+2. Adjust Job to point to the PV to be populated
+3. Run job to generate images
+
 Hacking
 -------
 
