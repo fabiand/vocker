@@ -1,26 +1,3 @@
-apiVersion: settings.k8s.io/v1alpha1
-kind: PodPreset
-metadata:
-  name: vocker-builder-mounts
-spec:
-  selector:
-    matchLabels:
-      role: vocker-job
-  volumeMounts:
-  - name: vocker-source
-    mountPath: /source
-  - name: vocker-target
-    mountPath: /target
-  volumes:
-  - name: vocker-source
-    configMap:
-      name: vocker-job-source
-  - name: vocker-target
-    emptyDir: {}
-#   persistentVolumeClaim:
-#   claimName: vocker-images
-# - name: cache # would be an improvement
----
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -52,4 +29,15 @@ spec:
       containers:
       - name: vocker
         image: quay.io/fabiand/vocker
+        volumeMounts:
+        - name: vocker-source
+          mountPath: /source
+        - name: vocker-target
+          mountPath: /target
+      volumes:
+      - name: vocker-source
+        configMap:
+          name: vocker-job-source
+      - name: vocker-target
+        emptyDir: {}
   backoffLimit: 4
