@@ -67,7 +67,34 @@ In order to build you custom images, you need to complete the following steps:
 2. Adjust Job to point to the PV to be populated
 3. Run job to generate images
 
-Then
+
+An example ConfigMap (the name is relevant):
+
+```yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vocker-job-source
+data:
+  Fedora: |
+    FROM fedora:26
+    
+    MAINTAINER "Fabian Deutsch" <fabiand@redhat.com>
+    ENV container docker
+    
+    RUN echo Hello > /marker
+    
+    EXPOSE 1234
+    
+    CMD echo World >> /marker
+
+  Ubuntu: |
+    FROM ubuntu-16.04
+```
+
+This ConfigMap would build two images `Fedora` and `Ubuntu`.
+
+The usage then looks like:
 
 ```bash
 $ kubectl apply -f manifests/vocker-builder-wo-presets.yaml
