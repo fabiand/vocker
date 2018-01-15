@@ -10,7 +10,7 @@ spec:
     spec:
       containers:
       - name: vocker
-        image: fabiand/vocker
+        image: quay.io/fabiand/vocker
       restartPolicy: Never
   backoffLimit: 4
 ---

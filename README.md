@@ -1,3 +1,5 @@
+[![Docker Repository on Quay](https://quay.io/repository/fabiand/vocker/status "Docker Repository on Quay")](https://quay.io/repository/fabiand/vocker)
+
 vocker - Create VMs not containers
 ==================================
 
