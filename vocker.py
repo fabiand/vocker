@@ -81,6 +81,9 @@ class Layer():
 
         qemu_img.create("-fqcow2", "-o", "backing_file=%s" % self.parent.filename, self.filename)
 
+    def export(self, dstfn):
+        qemu_img.convert("-Oraw", self.filename, dstfn)
+
     def exists(self):
         return self.filename and os.path.exists(self.filename)
 
@@ -279,6 +282,13 @@ def run():
             log.info("Tagging as %s" % args.tag)
             print(ctx.tag(args.tag))
 
+    def do_export(args):
+        log.info("Exporting %s to %s", args.IMAGE, args.file)
+
+        image = Layer()
+        image.name = args.IMAGE
+        image.export(args.file)
+
     def do_run(args):
         log.info("Instanciating %s as %s" % (args.IMAGE, args.name))
 
@@ -437,6 +447,12 @@ def run():
     build.add_argument("--force-rm", action="store_true")
     build.add_argument("--file", "-f", default="Dockerfile")
     build.set_defaults(func=do_build)
+
+    export = subparsers.add_parser("export",
+                                    help="Export an image")
+    export.add_argument("--file", "-f", nargs=1)
+    export.add_argument("IMAGE")
+    export.set_defaults(func=do_export)
 
     run = subparsers.add_parser("run",
                                 help="Create a VM from an image")

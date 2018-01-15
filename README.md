@@ -39,6 +39,9 @@ $ vocker build --tag simple -f examples/Dockerfile.simple
 $ vocker run simple
 fast_fedora
 $ vocker attach fast_fedora
+
+# Export an image
+$ vocker export simple -f simple.raw
 ```
 
 Hacking

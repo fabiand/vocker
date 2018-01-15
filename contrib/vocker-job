@@ -4,6 +4,7 @@ IMAGES=~/.cache/vocker/images
 
 SRC=$(realpath ${1:-/source})
 DST=$(realpath ${2:-/target})
+VOCKER=${VOCKER:-vocker}
 
 mkdir -p $SRC $DST
 
@@ -14,5 +15,5 @@ do
   ${VOCKER:-vocker} --debug build --tag $TAG --file "$SRCF"
 
   echo Exporting $TAG to raw file
-  qemu-img convert -O raw $IMAGES/$TAG "$DST/$TAG"
+  ${VOCKER} export -f "$DST/$TAG" $TAG
 done
