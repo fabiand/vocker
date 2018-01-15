@@ -1,0 +1,55 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: vocker-builder
+spec:
+  template:
+    metadata:
+      labels:
+        role: vocker-job
+    spec:
+      containers:
+      - name: vocker
+        image: fabiand/vocker
+      restartPolicy: Never
+  backoffLimit: 4
+---
+apiVersion: settings.k8s.io/v1alpha1
+kind: PodPreset
+metadata:
+  name: vocker-builder-mounts
+spec:
+  selector:
+    matchLabels:
+      role: vocker-job
+  volumeMounts:
+  - name: vocker-source
+    mountPath: /source
+  - name: vocker-target
+    mountPath: /target
+  volumes:
+  - name: vocker-source
+    configMap:
+      name: vocker-job-source
+  - name: vocker-target
+    emptyDir: {}
+#   persistentVolumeClaim:
+#   claimName: vocker-images
+# - name: cache # would be an improvement
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vocker-job-source
+data:
+  Fedora: |
+    FROM fedora:23
+    
+    MAINTAINER "Fabian Deutsch" <fabiand@redhat.com>
+    ENV container docker
+    
+    RUN echo Hello > /marker
+    
+    EXPOSE 1234
+    
+    CMD echo World >> /marker

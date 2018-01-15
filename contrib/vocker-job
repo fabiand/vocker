@@ -15,5 +15,5 @@ do
   ${VOCKER:-vocker} --debug build --tag $TAG --file "$SRCF"
 
   echo Exporting $TAG to raw file
-  ${VOCKER} export -f "$DST/$TAG" $TAG
+  ${VOCKER} export -f "$DST/$TAG.raw" $TAG
 done

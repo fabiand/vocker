@@ -7,4 +7,4 @@ ADD . /vocker.d/
 
 RUN cd /vocker.d && pip install -rrequirements.txt && python setup.py install
 
-CMD cd /vocker.d/contrib/vocker-job
+CMD cd /vocker.d/contrib/ && bash -x vocker-job
