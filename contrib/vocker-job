@@ -1,0 +1,19 @@
+#!/bin/bash
+
+IMAGES=~/.cache/vocker/images
+
+SRC=$(realpath ${1:-/source})
+DST=$(realpath ${2:-/target})
+VOCKER=${VOCKER:-vocker}
+
+mkdir -p $SRC $DST
+
+for SRCF in $(ls -f $SRC/*);
+do
+  TAG=$(basename $SRCF)
+  echo Building $TAG
+  ${VOCKER:-vocker} --debug build --tag $TAG --file "$SRCF"
+
+  echo Exporting $TAG to raw file
+  ${VOCKER} export -f "$DST/$TAG.raw" $TAG
+done
