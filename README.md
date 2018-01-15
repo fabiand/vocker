@@ -67,6 +67,51 @@ In order to build you custom images, you need to complete the following steps:
 2. Adjust Job to point to the PV to be populated
 3. Run job to generate images
 
+Then
+
+```bash
+$ kubectl apply -f manifests/vocker-builder-wo-presets.yaml
+$ kubectl describe job vocker-builder
+Name:           vocker-builder
+Namespace:      default
+Selector:       controller-uid=ea99dbe6-fa05-11e7-a917-48b8902b170b
+Labels:         controller-uid=ea99dbe6-fa05-11e7-a917-48b8902b170b
+                job-name=vocker-builder
+                role=vocker-job
+Annotations:    ...
+Parallelism:    1
+Completions:    1
+Start Time:     Mon, 15 Jan 2018 16:08:17 +0100
+Pods Statuses:  0 Running / 1 Succeeded / 0 Failed
+Pod Template:
+  Labels:  controller-uid=ea99dbe6-fa05-11e7-a917-48b8902b170b
+           job-name=vocker-builder
+           role=vocker-job
+  Containers:
+   vocker:
+    Image:        quay.io/fabiand/vocker
+    Port:         <none>
+    Environment:  <none>
+    Mounts:
+      /source from vocker-source (rw)
+      /target from vocker-target (rw)
+  Volumes:
+   vocker-source:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      vocker-job-source
+    Optional:  false
+   vocker-target:
+    Type:    EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:  
+Events:
+  Type    Reason            Age   From            Message
+  ----    ------            ----  ----            -------
+  Normal  SuccessfulCreate  40m   job-controller  Created pod: vocker-builder-xkckj
+
+```
+
+Once the pod has completed it's work, the image is ready on the PV.
+
 Hacking
 -------
 
