@@ -28,6 +28,7 @@ Installation
 
 ```bash
 $ pip install -rrequirements.txt
+$ yum install virt-install
 $ python setup.py install
 ```
 
